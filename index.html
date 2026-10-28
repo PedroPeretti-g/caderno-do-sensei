@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caderno do Sensei</title>
+<meta name="description" content="Alunos, turmas, mensalidades, aulas e eventos do seu dojo em um só lugar.">
+<meta name="theme-color" content="#0a2952">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Caderno do Sensei">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Gelasio:wght@700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap hero-in">
+    <div class="navpill">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#f3cd3c"/><path d="M9 11.5l14 9M23 11.5l-14 9" stroke="#0a2952" stroke-width="4.2" stroke-linecap="round"/></svg>
+        <div class="brand-t"><b>Caderno do Sensei</b><small>judô · dojo · aulas</small></div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Seções do caderno">
+        <button type="button" class="tab" role="tab" id="tab-alunos" aria-controls="panel-alunos" aria-selected="true" data-tab="alunos">Alunos</button>
+        <button type="button" class="tab" role="tab" id="tab-turmas" aria-controls="panel-turmas" aria-selected="false" data-tab="turmas">Turmas</button>
+        <button type="button" class="tab" role="tab" id="tab-financeiro" aria-controls="panel-financeiro" aria-selected="false" data-tab="financeiro">Finanças</button>
+        <button type="button" class="tab" role="tab" id="tab-planejamento" aria-controls="panel-planejamento" aria-selected="false" data-tab="planejamento">Planejamento e eventos</button>
+      </nav>
+    </div>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow" id="hero-eyebrow">Caderno do Sensei · Judô</p>
+        <h1 id="hero-h1">Dojo em dia.</h1>
+        <p class="hero-sub" id="hero-sub"></p>
+        <div class="hero-cta"><button type="button" class="btn" id="hero-cta" data-act="hero-cta"></button></div>
+      </div>
+      <div class="stage" aria-hidden="true">
+        <svg class="scene" id="scene" viewBox="0 0 360 290" focusable="false">
+          <g transform="translate(180 150)">
+            <g transform="translate(0 18) scale(1 .5) rotate(45)"><rect x="-100" y="-100" width="200" height="200" rx="8" fill="#071b3a"/></g>
+            <g transform="scale(1 .5) rotate(45)">
+              <rect class="mat-out" x="-100" y="-100" width="200" height="200" rx="8"/>
+              <rect class="mat-in" x="-68" y="-68" width="136" height="136" rx="5"/>
+              <path d="M0 -68V68M-68 0H68" stroke="#0a2952" stroke-opacity=".22" stroke-width="2"/>
+              <rect x="-68" y="-68" width="136" height="136" rx="5" fill="none" stroke="#0a2952" stroke-opacity=".28" stroke-width="2"/>
+            </g>
+            <g class="pillar"><rect x="-109" y="-93" width="20" height="74" rx="6"/><rect x="-109" y="-93" width="20" height="10" rx="5" class="cap"/></g>
+            <g class="pillar"><rect x="89" y="-93" width="20" height="74" rx="6"/><rect x="89" y="-93" width="20" height="10" rx="5" class="cap"/></g>
+            <ellipse class="gi-shadow" cx="0" cy="20" rx="46" ry="10" fill="#000" opacity=".28"/>
+            <g transform="translate(0 -66) scale(.72)">
+              <g class="gi-bob">
+                <path class="gi" d="M-38 18L-2 18L-6 110L-44 110Z"/>
+                <path class="gi" d="M38 18L2 18L6 110L44 110Z"/>
+                <path class="gi-line" d="M-44 100H-6M44 100H6"/>
+                <g class="sl sl-l"><path class="gi" d="M-32 -68L-96 -38L-90 -2L-34 -26Z"/><path class="gi gi-dark" d="M-96 -38L-90 -2L-82 -4L-88 -40Z"/></g>
+                <g class="sl sl-r"><path class="gi" d="M32 -68L96 -38L90 -2L34 -26Z"/><path class="gi gi-dark" d="M96 -38L90 -2L82 -4L88 -40Z"/></g>
+                <path class="gi" d="M-34 -70Q0 -82 34 -70L40 26Q0 34 -40 26Z"/>
+                <path d="M-8 -78L8 -78L0 -50Z" fill="#0a2952" opacity=".38"/>
+                <path class="gi gi-dark" d="M-19 -78L-7 -78L19 2L7 2Z"/>
+                <path class="gi gi-dark" d="M19 -78L7 -78L-19 2L-7 2Z"/>
+                <g class="tails"><path class="belt-f" d="M-5 8L-19 42L-9 46L1 10Z"/><path class="belt-f" d="M5 8L13 38L23 33L9 6Z"/></g>
+                <rect class="belt-f" x="-42" y="-7" width="84" height="14" rx="3"/>
+                <rect class="belt-f" x="-9" y="-10" width="18" height="20" rx="5"/>
+              </g>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="hero-foot">
+      <span id="hero-count"></span>
+      <span class="foot-r"><span id="store-note">Carregando…</span><button type="button" class="linkbtn" id="logout-btn" data-act="logout" hidden>Sair</button></span>
+    </div>
+  </div>
+</header>
+
+<div class="tbar" id="tbar" hidden>
+  <div class="wrap tbar-in">
+    <div class="tchips" id="tchips" role="group" aria-label="Filtrar por turma"></div>
+    <div class="tinfo" id="tinfo" hidden></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="banner" id="demo-banner" hidden>
+    <p id="banner-msg"></p>
+    <div class="banner-acts" id="banner-acts"></div>
+  </div>
+
+  <section id="panel-alunos" role="tabpanel" aria-labelledby="tab-alunos">
+    <div class="sec-head">
+      <div>
+        <p class="eyebrow" id="al-eyebrow">Cadastro</p>
+        <h2 id="al-title">Alunos</h2>
+      </div>
+      <div class="head-actions"><button type="button" class="btn sm" data-act="new-student" data-key="new-al">Novo aluno</button></div>
+    </div>
+    <div class="toolbar">
+      <div class="chips" id="al-chips" role="group" aria-label="Filtrar alunos"></div>
+      <div class="toolbar-fields">
+        <label class="sr" for="al-q">Buscar aluno ou responsável</label>
+        <input id="al-q" type="search" placeholder="Buscar aluno ou responsável" autocomplete="off">
+      </div>
+    </div>
+    <div class="card list" id="al-list"></div>
+  </section>
+
+  <section id="panel-turmas" role="tabpanel" aria-labelledby="tab-turmas" hidden>
+    <div class="sec-head">
+      <div>
+        <p class="eyebrow">Organização</p>
+        <h2 id="tu-title">Turmas</h2>
+      </div>
+      <div class="head-actions"><button type="button" class="btn sm" data-act="new-turma" data-key="new-tu">Nova turma</button></div>
+    </div>
+    <div class="tcards" id="tu-grid"></div>
+    <div class="card access">
+      <h3>Acesso dos professores</h3>
+      <p class="hint">Cada professor entra com a própria conta do Claude. Alunos, turmas, aulas e finanças de cada um ficam separados e privados. Para convidar outro professor, use o menu Compartilhar desta página e dê a ele permissão de colaborador.</p>
+    </div>
+  </section>
+
+  <section id="panel-financeiro" role="tabpanel" aria-labelledby="tab-financeiro" hidden>
+    <div class="sec-head">
+      <div>
+        <p class="eyebrow">Mensalidades</p>
+        <div class="monthnav">
+          <button type="button" class="icon-btn" data-act="fin-prev" aria-label="Mês anterior"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <h2 id="fin-label"></h2>
+          <button type="button" class="icon-btn" data-act="fin-next" aria-label="Próximo mês"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+        </div>
+      </div>
+      <div class="head-actions">
+        <button type="button" class="btn ghost sm" id="export-btn" data-act="export">Exportar mensalidades</button></div>
+    </div>
+
+    <div class="fin-top">
+      <div class="kpis" id="kpis"></div>
+      <div class="card chart" id="chart"></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="chips" id="fin-chips" role="group" aria-label="Filtrar por situação"></div>
+      <div class="toolbar-fields">
+        <label class="sr" for="fin-q">Buscar aluno ou responsável</label>
+        <input id="fin-q" type="search" placeholder="Buscar aluno ou responsável" autocomplete="off">
+      </div>
+    </div>
+    <div class="card list" id="list"></div>
+
+    <div class="sec-head">
+      <div>
+        <p class="eyebrow">Competições, exames de faixa e outros</p>
+        <h2 class="h2s">Pagamentos de eventos</h2>
+      </div>
+      <div class="head-actions"><span class="hint" id="ev-fin-sum"></span></div>
+    </div>
+    <div class="ev-fin" id="ev-fin"></div>
+  </section>
+
+  <section id="panel-planejamento" role="tabpanel" aria-labelledby="tab-planejamento" hidden>
+    <div class="sec-head">
+      <div>
+        <p class="eyebrow">Próximos eventos</p>
+        <h2 class="h2s">O que vem por aí</h2>
+      </div>
+      <div class="head-actions">
+        <button type="button" class="btn sm" data-act="new-event">Novo evento</button>
+      </div>
+    </div>
+    <div class="ev-up" id="ev-up"></div>
+
+    <div class="sec-head">
+      <div>
+        <p class="eyebrow">Calendário de aulas e eventos</p>
+        <div class="monthnav">
+          <button type="button" class="icon-btn" data-act="plan-prev" aria-label="Mês anterior"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <h2 id="plan-label"></h2>
+          <button type="button" class="icon-btn" data-act="plan-next" aria-label="Próximo mês"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+        </div>
+      </div>
+      <div class="head-actions"><span class="hint">Barrinha colorida no dia = aula prevista na grade da turma</span></div>
+    </div>
+
+    <div class="plan-grid" style="margin-top:0">
+      <div class="plan-main">
+        <div class="card cal-card">
+          <div class="cal" aria-hidden="true">
+            <div class="dow">Dom</div><div class="dow">Seg</div><div class="dow">Ter</div><div class="dow">Qua</div><div class="dow">Qui</div><div class="dow">Sex</div><div class="dow">Sáb</div>
+          </div>
+          <div class="cal" id="cal" role="group" aria-label="Dias do mês"></div>
+        </div>
+
+        <div class="card day-panel" id="day">
+          <h3 id="day-label"></h3>
+          <div class="day-events" id="day-events"></div>
+          <div><button type="button" class="btn ghost sm" data-act="new-event" data-key="newev-day">Novo evento neste dia</button></div>
+          <div id="day-plan"></div>
+          <h4 class="sub-h">Aulas registradas</h4>
+          <div class="lessons" id="day-list"></div>
+          <form class="form" id="lesson-form" novalidate>
+            <h4 id="lf-title">Registrar aula</h4>
+            <div class="field">
+              <label for="lf-tema">Tema da aula</label>
+              <input id="lf-tema" type="text" maxlength="120" placeholder="Ex.: Ukemi e quedas básicas" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="lf-turma">Turma</label>
+              <select id="lf-turma" style="width:100%"></select>
+            </div>
+            <div class="field">
+              <label for="lf-conteudo">O que foi trabalhado</label>
+              <textarea id="lf-conteudo" maxlength="2000" placeholder="Técnicas, exercícios, randori, como a turma reagiu"></textarea>
+            </div>
+            <div class="field">
+              <label for="lf-proxima">Para a próxima aula</label>
+              <input id="lf-proxima" type="text" maxlength="200" placeholder="Opcional" autocomplete="off">
+            </div>
+            <div class="err" id="lf-err" role="alert"></div>
+            <div class="form-acts">
+              <button type="submit" class="btn" id="lf-save">Salvar aula</button>
+              <button type="button" class="btn ghost" id="lf-cancel" data-act="cancel-edit" hidden>Cancelar edição</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <aside class="card summary" id="summary" aria-labelledby="sum-title"></aside>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="overlay" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+
+<script src="vendor/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
