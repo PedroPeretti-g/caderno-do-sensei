@@ -30,7 +30,7 @@ O serviço de e-mail padrão do Supabase só envia para membros da sua organiza�
 
 ## Banco de dados
 
-O esquema completo está em `banco/esquema-supabase.sql` (já aplicado no projeto). Para recriar em outro projeto, cole o arquivo no **SQL Editor** do Supabase e execute.
+O esquema completo está em `banco/esquema-supabase.sql` e a lista de presença em `banco/presencas.sql` (ambos já aplicados no projeto). Para recriar em outro projeto, cole os dois arquivos, nesta ordem, no **SQL Editor** do Supabase e execute.
 
 ## Teste de isolamento (faça antes de cadastrar alunos de verdade)
 
@@ -47,6 +47,7 @@ O esquema completo está em `banco/esquema-supabase.sql` (já aplicado no projet
 | `vendor/supabase.js` | Biblioteca oficial `@supabase/supabase-js` 2.117.3 (cópia local) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Instalação como aplicativo e abertura sem sinal (os dados continuam exigindo internet) |
 | `banco/esquema-supabase.sql` | Tabelas, regras de acesso e gatilho de cadastro |
+| `banco/presencas.sql` | Tabela da lista de presença (aba Presença) |
 
 ## Antes de cobrar ou divulgar
 

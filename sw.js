@@ -1,6 +1,6 @@
 /* Guarda os arquivos do app para abrir mais rápido e funcionar sem sinal.
    Sempre tenta a internet primeiro, então atualizações chegam na hora. Os dados ficam só no banco. */
-const CACHE = 'caderno-sensei-v1';
+const CACHE = 'caderno-sensei-v2';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

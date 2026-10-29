@@ -29,6 +29,7 @@
       <nav class="tabs" role="tablist" aria-label="Seções do caderno">
         <button type="button" class="tab" role="tab" id="tab-alunos" aria-controls="panel-alunos" aria-selected="true" data-tab="alunos">Alunos</button>
         <button type="button" class="tab" role="tab" id="tab-turmas" aria-controls="panel-turmas" aria-selected="false" data-tab="turmas">Turmas</button>
+        <button type="button" class="tab" role="tab" id="tab-presenca" aria-controls="panel-presenca" aria-selected="false" data-tab="presenca">Presença</button>
         <button type="button" class="tab" role="tab" id="tab-financeiro" aria-controls="panel-financeiro" aria-selected="false" data-tab="financeiro">Finanças</button>
         <button type="button" class="tab" role="tab" id="tab-planejamento" aria-controls="panel-planejamento" aria-selected="false" data-tab="planejamento">Planejamento e eventos</button>
       </nav>
@@ -122,8 +123,29 @@
     <div class="tcards" id="tu-grid"></div>
     <div class="card access">
       <h3>Acesso dos professores</h3>
-      <p class="hint">Cada professor entra com a própria conta do Claude. Alunos, turmas, aulas e finanças de cada um ficam separados e privados. Para convidar outro professor, use o menu Compartilhar desta página e dê a ele permissão de colaborador.</p>
+      <p class="hint">Cada professor entra com o próprio e-mail e senha. Alunos, turmas, presenças, aulas e finanças de cada um ficam separados e privados.</p>
     </div>
+  </section>
+
+  <section id="panel-presenca" role="tabpanel" aria-labelledby="tab-presenca" hidden>
+    <div class="sec-head">
+      <div>
+        <p class="eyebrow">Chamada</p>
+        <h2>Presença</h2>
+      </div>
+    </div>
+    <div class="card att-bar" id="att-bar" hidden>
+      <div class="field"><label for="att-turma">Turma</label><select id="att-turma"></select></div>
+      <div class="field"><label for="att-date">Data da aula</label>
+        <div class="att-date">
+          <button type="button" class="icon-btn" data-act="att-prev" aria-label="Aula anterior"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <input id="att-date" type="date">
+          <button type="button" class="icon-btn" id="att-next" data-act="att-next" aria-label="Próxima aula"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button type="button" class="btn ghost sm" data-act="att-today">Hoje</button>
+        </div>
+      </div>
+    </div>
+    <div id="att-body" class="att-body"></div>
   </section>
 
   <section id="panel-financeiro" role="tabpanel" aria-labelledby="tab-financeiro" hidden>

@@ -122,7 +122,8 @@ const fromRows = R => {
   const parts = {};
   R.inscricoes.forEach(r => { (parts[r.evento_id] = parts[r.evento_id] || {})[r.aluno_id] = r.pago ? {pago:true, em:r.pago_em ? String(r.pago_em).slice(0,10) : '', v:+r.valor_pago || 0} : {pago:false}; });
   const events = R.eventos.map(r => ({id:r.id, titulo:r.titulo, tipo:r.tipo, date:String(r.data_evento).slice(0,10), hora:hhmm(r.hora), local:r.local_evento || '', taxa:+r.taxa || 0, prazo:r.prazo_pagamento ? String(r.prazo_pagamento).slice(0,10) : '', obs:r.obs || '', participantes:parts[r.id] || {}, criado:msOf(r.criado_em)}));
-  return {turmas:turmas, students:students, lessons:lessons, events:events};
+  const att = (R.presencas || []).map(r => ({t:r.turma_id, s:r.aluno_id, d:String(r.data_aula).slice(0,10), p:!!r.presente}));
+  return {turmas:turmas, students:students, lessons:lessons, events:events, att:att};
 };
 const turmaToRow = t => ({id:t.id, nome:t.nome, dias:turmaDias(t), hora_inicio:nn(t.hora), hora_fim:nn(t.fim), local_treino:nn(t.local), obs:nn(t.obs)});
 const alunoToRow = (s, turmaId) => ({id:s.id, turma_id:turmaId || null, nome:s.nome, faixa:nn(s.faixa), nascimento:nn(s.nasc), nome_mae:nn(s.mae), nome_pai:nn(s.pai), telefone:nn(s.tel), saude:nn(s.saude), obs:nn(s.obs), mensalidade:Math.max(0, +s.valor || 0), dia_vencimento:Math.min(31, Math.max(1, Math.floor(+s.venc) || 5)), aluno_desde:(/^\d{4}-\d{2}$/.test(s.inicio || '') ? s.inicio : ymOf(new Date()))+'-01', ativo:s.ativo !== false});
@@ -130,6 +131,24 @@ const pagamentoRows = s => Object.keys(s.pay || {}).map(ym => ({aluno_id:s.id, m
 const aulaToRow = (l, turmaId) => ({id:l.id, turma_id:turmaId || null, data_aula:l.date, tema:l.tema, conteudo:nn(l.conteudo), proxima:nn(l.proxima)});
 const eventoToRow = e => ({id:e.id, titulo:e.titulo, tipo:e.tipo, data_evento:e.date, hora:nn(e.hora), local_evento:nn(e.local), taxa:Math.max(0, +e.taxa || 0), prazo_pagamento:nn(e.prazo), obs:nn(e.obs)});
 const inscricaoRows = e => Object.keys(e.participantes || {}).map(sid => { const p = e.participantes[sid] || {}; return {evento_id:e.id, aluno_id:sid, pago:!!p.pago, pago_em:p.pago ? (nn(p.em) || isoDate(new Date())) : null, valor_pago:p.pago ? Math.max(0, +p.v || 0) : null}; });
+/* presença */
+const attKey = (t, s, d) => t+'|'+s+'|'+d;
+const attIndex = list => { const m = new Map(); (list || []).forEach(a => m.set(attKey(a.t, a.s, a.d), !!a.p)); return m; };
+const attNear = (t, iso, dir) => {
+  const dias = turmaDias(t), step = dir < 0 ? -1 : 1;
+  if (!dias.length) { const x = fromISO(iso); x.setDate(x.getDate()+7*step); return isoDate(x); }
+  for (let i = 1; i <= 7; i++) { const x = fromISO(iso); x.setDate(x.getDate()+i*step); if (dias.indexOf(x.getDay()) >= 0) return isoDate(x); }
+  return iso;
+};
+const attCount = (idx, tid, sids, d) => { const c = {p:0, f:0, n:0}; sids.forEach(s => { const v = idx.get(attKey(tid, s, d)); if (v === true) c.p++; else if (v === false) c.f++; else c.n++; }); return c; };
+const attMonth = (att, tid, sids, ym) => {
+  const set = new Set(sids), per = {}, days = new Set();
+  sids.forEach(s => { per[s] = {p:0, f:0}; });
+  (att || []).forEach(a => { if (a.t !== tid || !set.has(a.s) || a.d.indexOf(ym) !== 0) return; days.add(a.d); if (a.p) per[a.s].p++; else per[a.s].f++; });
+  return {days:days.size, per:per};
+};
+const attPct = r => (r.p + r.f) ? Math.round(r.p / (r.p + r.f) * 100) : null;
+const attRow = (tid, sid, d, p) => ({turma_id:tid, aluno_id:sid, data_aula:d, presente:!!p});
 /* PURE:END */
 
 const BELTS = [['','Sem faixa'],['branca','Branca'],['cinza','Cinza'],['azul','Azul'],['amarela','Amarela'],['laranja','Laranja'],['verde','Verde'],['roxa','Roxa'],['marrom','Marrom'],['preta','Preta']];
@@ -142,11 +161,11 @@ const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&3|8)).toString(16); });
 const upsert = (arr, item) => { const i = arr.findIndex(x => x.id === item.id); if (i >= 0) arr[i] = item; else arr.push(item); };
-const TABS = ['alunos','turmas','financeiro','planejamento'];
+const TABS = ['alunos','turmas','presenca','financeiro','planejamento'];
 
 const now0 = new Date();
 const state = {
-  tab:'alunos', students:[], lessons:[], events:[], turmas:[], turma:'', meName:'', user:null,
+  tab:'alunos', students:[], lessons:[], events:[], turmas:[], att:[], attTurma:'', attDate: isoDate(now0), turma:'', meName:'', user:null,
   decided:false, demo:false, loadError:false,
   finMonth: ymOf(now0), planMonth: ymOf(now0), selDay: isoDate(now0),
   finFilter:'todos', finQuery:'', alFilter:'todos', alQuery:'', editLesson:null, lastTurma:''
@@ -209,27 +228,30 @@ function enqueue(fn){
   return chain;
 }
 
-async function fetchAll(table){
+async function fetchAll(table, mod){
   const out = [];
   for (let from = 0; ; from += 1000) {
-    const rows = await run(sb.from(table).select('*').order('id').range(from, from + 999));
+    let q = sb.from(table).select('*');
+    if (mod) q = mod(q);
+    const rows = await run(q.order('id').range(from, from + 999));
     out.push.apply(out, rows);
     if (rows.length < 1000) break;
   }
   return out;
 }
 async function loadAll(){
-  const r = await Promise.all(['turmas','alunos','pagamentos','aulas','eventos','inscricoes'].map(fetchAll));
+  const r = await Promise.all(['turmas','alunos','pagamentos','aulas','eventos','inscricoes'].map(t => fetchAll(t)).concat([fetchAll('presencas', q => q.gte('data_aula', attMin()))]));
   loadedAt = Date.now();
-  return fromRows({turmas:r[0], alunos:r[1], pagamentos:r[2], aulas:r[3], eventos:r[4], inscricoes:r[5]});
+  return fromRows({turmas:r[0], alunos:r[1], pagamentos:r[2], aulas:r[3], eventos:r[4], inscricoes:r[5], presencas:r[6]});
 }
 async function reload(){
   if (!sb || !state.user) return;
   const d = await loadAll();
-  state.students = d.students; state.lessons = d.lessons; state.events = d.events; state.turmas = d.turmas;
+  state.students = d.students; state.lessons = d.lessons; state.events = d.events; state.turmas = d.turmas; state.att = d.att;
   render();
 }
 
+const attMin = () => { const x = new Date(); x.setDate(x.getDate()-400); return isoDate(x); };
 const tid = name => { const t = state.turmas.find(x => x.nome === name); return t ? t.id : null; };
 store = {
   saveTurma: t => enqueue(() => run(sb.from('turmas').upsert(turmaToRow(t)))),
@@ -253,7 +275,11 @@ store = {
     if (rows.length) del = del.not('aluno_id', 'in', '('+rows.map(r => r.aluno_id).join(',')+')');
     await run(del);
   }),
-  delEvent: id => enqueue(() => run(sb.from('eventos').delete().eq('id', id)))
+  delEvent: id => enqueue(() => run(sb.from('eventos').delete().eq('id', id))),
+  setAtt: (t, sid, d, p) => enqueue(() => p === null
+    ? run(sb.from('presencas').delete().eq('turma_id', t).eq('aluno_id', sid).eq('data_aula', d))
+    : run(sb.from('presencas').upsert(attRow(t, sid, d, p), {onConflict:'turma_id,aluno_id,data_aula'}))),
+  setAttMany: rows => enqueue(() => run(sb.from('presencas').upsert(rows, {onConflict:'turma_id,aluno_id,data_aula'})))
 };
 
 /* As alterações aparecem na tela na hora e são enviadas ao banco em seguida. */
@@ -263,12 +289,24 @@ const act = {
     const D = data();
     D.students = D.students.filter(x => x.id !== i);
     D.events.forEach(e => { if (e.participantes) delete e.participantes[i]; });
+    D.att = D.att.filter(a => a.s !== i);
     render(); return state.demo ? Promise.resolve() : store.delStudent(i);
   },
   saveLesson(l){ upsert(data().lessons, l); render(); return state.demo ? Promise.resolve() : store.saveLesson(l); },
   delLesson(i){ const D = data(); D.lessons = D.lessons.filter(x => x.id !== i); render(); return state.demo ? Promise.resolve() : store.delLesson(i); },
   saveEvent(e){ upsert(data().events, e); render(); return state.demo ? Promise.resolve() : store.saveEvent(e); },
   delEvent(i){ const D = data(); D.events = D.events.filter(x => x.id !== i); render(); return state.demo ? Promise.resolve() : store.delEvent(i); },
+  setAtt(t, sid, d, p){
+    const D = data();
+    D.att = D.att.filter(a => !(a.t === t && a.s === sid && a.d === d));
+    if (p !== null) D.att.push({t:t, s:sid, d:d, p:p});
+    render(); return state.demo ? Promise.resolve() : store.setAtt(t, sid, d, p);
+  },
+  allPresent(t, sids, d){
+    const D = data(), idx = attIndex(D.att), rows = [];
+    sids.forEach(sid => { if (idx.get(attKey(t, sid, d)) !== true) { D.att = D.att.filter(a => !(a.t === t && a.s === sid && a.d === d)); D.att.push({t:t, s:sid, d:d, p:true}); rows.push(attRow(t, sid, d, true)); } });
+    render(); return (state.demo || !rows.length) ? Promise.resolve() : store.setAttMany(rows);
+  },
   async saveTurma(t, oldName){
     const D = data();
     upsert(D.turmas, t);
@@ -286,13 +324,14 @@ const act = {
     D.students.forEach(x => { if (x.turma === t.nome) x.turma = ''; });
     D.lessons.forEach(x => { if (x.turma === t.nome) x.turma = ''; });
     D.turmas = D.turmas.filter(x => x.id !== t.id);
+    D.att = D.att.filter(a => a.t !== t.id);
     render();
     if (!state.demo) await store.delTurma(t.id);
   }
 };
 
 /* ---------- entrar, sair, criar conta ---------- */
-const emptyData = () => ({students:[], lessons:[], events:[], turmas:[]});
+const emptyData = () => ({students:[], lessons:[], events:[], turmas:[], att:[]});
 async function enterApp(user){
   if (sheet.open) closeSheet();
   Object.assign(state, emptyData(), {user:user, meName:(user.user_metadata && user.user_metadata.nome) || '', demo:false, decided:false, loadError:false, turma:''});
@@ -467,7 +506,14 @@ function makeDemo(){
     {id:'ex-'+uid(), nome:'Sub 15', dias:[6], hora:'09:00', fim:'10:30', local:'Tatame principal', obs:'', criado:2, exemplo:true},
     {id:'ex-'+uid(), nome:'Adultos', dias:[1,3], hora:'20:00', fim:'21:30', local:'Tatame principal', obs:'', criado:3, exemplo:true}
   ];
-  return {students:s, lessons:ls, events:evs, turmas:tu};
+  const att = [];
+  for (let d = 1; d <= daysIn(cur); d++) {
+    const iso = cur+'-'+pad(d); if (iso > todayISO) break;
+    const wd = fromISO(iso).getDay();
+    if (wd === 2 || wd === 4) [0, 1, 2].forEach(i => att.push({t:tu[0].id, s:s[i].id, d:iso, p:((d + i*3) % 7) !== 0}));
+    if (wd === 6) [3, 4].forEach(i => att.push({t:tu[1].id, s:s[i].id, d:iso, p:((d + i) % 5) !== 0}));
+  }
+  return {students:s, lessons:ls, events:evs, turmas:tu, att:att};
 }
 
 /* ---------- renderização ---------- */
@@ -475,7 +521,7 @@ function upcomingEvents(){ const today = isoDate(new Date()); return visEvents()
 
 function renderTbar(){
   const bar = $('#tbar'), list = turmaObjs(), D = data();
-  bar.hidden = !state.decided || list.length === 0;
+  bar.hidden = !state.decided || list.length === 0 || state.tab === 'presenca';
   if (bar.hidden) return;
   if (state.turma && !list.some(t => t.nome === state.turma)) state.turma = '';
   $('#tchips').innerHTML = '<button type="button" class="tchip" data-act="set-turma" data-name="" data-key="tc:" aria-pressed="'+(!state.turma)+'">Todas as turmas</button>'+
@@ -511,11 +557,11 @@ function renderChrome(){
 }
 
 function renderHero(){
-  const tab = state.tab, titles = {alunos:'Seus alunos.', turmas:'Suas turmas.', financeiro:'Dojo em dia.', planejamento:'Treino com plano.'};
+  const tab = state.tab, titles = {alunos:'Seus alunos.', turmas:'Suas turmas.', presenca:'Chamada em dia.', financeiro:'Dojo em dia.', planejamento:'Treino com plano.'};
   $('#hero-h1').textContent = titles[tab];
-  $('#hero-eyebrow').textContent = {alunos:'Alunos · Judô', turmas:'Turmas · Judô', financeiro:'Finanças · Judô', planejamento:'Planejamento · Judô'}[tab];
+  $('#hero-eyebrow').textContent = {alunos:'Alunos · Judô', turmas:'Turmas · Judô', presenca:'Presença · Judô', financeiro:'Finanças · Judô', planejamento:'Planejamento · Judô'}[tab];
   const cta = $('#hero-cta');
-  const cfg = {alunos:['Novo aluno','new-student'], turmas:['Nova turma','new-turma'], financeiro:['Ver alunos','go-alunos'], planejamento:['Novo evento','new-event']}[tab];
+  const cfg = {alunos:['Novo aluno','new-student'], turmas:['Nova turma','new-turma'], presenca:['Chamada de hoje','att-today'], financeiro:['Ver alunos','go-alunos'], planejamento:['Novo evento','new-event']}[tab];
   cta.innerHTML = cfg[0]+' '+ARROW; cta.dataset.target = cfg[1];
   let sub = 'Alunos, turmas, mensalidades, aulas e eventos do dojo em um só lugar.';
   if (!state.decided) sub = 'Carregando o seu dojo…';
@@ -526,6 +572,9 @@ function renderHero(){
     if (tab === 'alunos') {
       const care = ativos.filter(s => s.saude && String(s.saude).trim()).length;
       if (ativos.length) { parts.push(ativos.length+(ativos.length === 1 ? ' aluno ativo' : ' alunos ativos')); if (care) parts.push(care+' com cuidados de saúde'); }
+    } else if (tab === 'presenca') {
+      const t = attTurmaObj();
+      if (t) { const idx = attIndex(D.att), ids = D.students.filter(x => x.turma === t.nome && x.ativo !== false).map(x => x.id), cc = attCount(idx, t.id, ids, state.attDate); parts.push(t.nome+(ids.length ? ': '+cc.p+' presentes, '+cc.f+(cc.f === 1 ? ' falta' : ' faltas')+' em '+fmtBR(state.attDate).slice(0,5) : '')); }
     } else if (tab === 'turmas') {
       const n = turmaObjs().length;
       if (n) parts.push(n+(n === 1 ? ' turma' : ' turmas')+' e '+D.students.filter(s => s.ativo !== false).length+' alunos ativos');
@@ -717,6 +766,7 @@ function renderTurmas(){
       '<p class="tc-sub">'+nl+(nl === 1 ? ' aula registrada' : ' aulas registradas')+' em '+MES[+ym.slice(5)-1]+'</p>'+
       (t.obs ? '<p class="tc-sub">'+esc(t.obs)+'</p>' : '')+
       '<div class="tc-acts"><button type="button" class="btn sm" data-act="go-turma-alunos" data-name="'+k+'" data-key="tca:'+k+'">Ver alunos</button>'+
+      '<button type="button" class="btn ghost sm" data-act="go-turma-att" data-name="'+k+'" data-key="tcc:'+k+'">Chamada</button>'+
       '<button type="button" class="btn ghost sm" data-act="go-turma-plan" data-name="'+k+'" data-key="tcp:'+k+'">Calendário</button>'+
       '<button type="button" class="btn ghost sm" data-act="edit-turma" data-id="'+esc(t.id || '')+'" data-name="'+k+'" data-key="tce:'+k+'">'+(t.id ? 'Editar' : 'Definir dias')+'</button></div>'+
     '</article>';
@@ -810,9 +860,73 @@ function renderSummary(ls, evs){
     '<textarea id="copy-fallback" class="sr" readonly aria-label="Resumo para copiar"></textarea>';
 }
 
+/* ---------- presença ---------- */
+const byNome = (a, b) => a.nome.localeCompare(b.nome, 'pt-BR');
+function attTurmaObj(){
+  const list = (data().turmas || []).slice().sort(byNome);
+  if (!list.length) return null;
+  let t = list.find(x => x.id === state.attTurma);
+  if (!t) { t = (state.turma && list.find(x => x.nome === state.turma)) || list.find(x => turmaDias(x).indexOf(new Date().getDay()) >= 0) || list[0]; state.attTurma = t.id; }
+  return t;
+}
+function renderPresenca(){
+  const host = $('#att-body'); if (!host) return;
+  const bar = $('#att-bar'), D = data(), today = isoDate(new Date());
+  if (!state.decided) { bar.hidden = true; host.innerHTML = '<p class="hint">Carregando…</p>'; return; }
+  const list = (D.turmas || []).slice().sort(byNome);
+  if (!list.length) {
+    bar.hidden = true;
+    host.innerHTML = '<div class="card empty"><strong>Crie uma turma para fazer a chamada</strong><p>A lista de presença é feita por turma. Cadastre a turma, coloque os alunos nela e volte aqui.</p><div><button type="button" class="btn sm" data-act="go-turmas" data-key="att-go-tu">Ir para Turmas</button></div></div>';
+    return;
+  }
+  bar.hidden = false;
+  const t = attTurmaObj();
+  if (state.attDate > today) state.attDate = today;
+  const d = state.attDate, ym = d.slice(0,7), idx = attIndex(D.att);
+  const sel = $('#att-turma');
+  sel.innerHTML = list.map(x => '<option value="'+esc(x.id)+'"'+(x.id === t.id ? ' selected' : '')+'>'+esc(x.nome)+'</option>').join('');
+  const di = $('#att-date'); di.value = d; di.max = today; di.min = attMin();
+  $('#att-next').disabled = d >= today;
+  const base = D.students.filter(s => s.turma === t.nome && s.ativo !== false);
+  const extra = D.students.filter(s => s.turma !== t.nome && idx.has(attKey(t.id, s.id, d)));
+  const day = base.concat(extra).sort(byNome), ids = day.map(s => s.id), cc = attCount(idx, t.id, ids, d);
+  const planned = turmaDias(t).indexOf(weekdayIdx(d)) >= 0;
+  const wlabel = cap(fromISO(d).toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'}));
+  const hint = [untilLabel(daysUntil(d, today)), planned ? 'aula prevista'+(t.hora ? ' às '+t.hora : '') : (turmaDias(t).length ? 'dia sem aula prevista para esta turma' : 'dias da turma não definidos')].join(' · ');
+  let html = '<div class="att-head"><div><h3 class="att-day">'+esc(wlabel)+'</h3><p class="hint">'+esc(hint)+'</p></div>'+
+    (day.length ? '<button type="button" class="btn sm" data-act="att-all" data-key="att-all"'+(cc.p === day.length ? ' disabled' : '')+'>Marcar todos presentes</button>' : '')+'</div>';
+  if (!day.length) {
+    html += '<div class="card empty"><strong>Nenhum aluno nesta turma</strong><p>Cadastre alunos e escolha esta turma na ficha deles. Eles aparecem aqui para a chamada.</p><div><button type="button" class="btn sm" data-act="go-alunos" data-key="att-go-al">Ir para Alunos</button></div></div>';
+  } else {
+    html += '<div class="mini"><div><b>'+cc.p+'</b><span>'+(cc.p === 1 ? 'presente' : 'presentes')+'</span></div><div><b>'+cc.f+'</b><span>'+(cc.f === 1 ? 'falta' : 'faltas')+'</span></div><div><b>'+cc.n+'</b><span>sem registro</span></div></div>';
+    html += '<div class="card list">'+day.map(s => {
+      const v = idx.get(attKey(t.id, s.id, d)), k = esc(s.id), belt = s.faixa && BELT_COLOR[s.faixa] ? ' style="--belt:'+BELT_COLOR[s.faixa]+'"' : '';
+      return '<div class="row att-row"><div class="who static"><span class="avatar"'+belt+' aria-hidden="true">'+esc(initials(s.nome))+'</span>'+
+        '<span class="who-txt"><strong>'+esc(s.nome)+'</strong><span class="meta">'+(s.faixa ? esc(cap(s.faixa)) : 'Sem faixa')+(s.turma !== t.nome ? ' · '+esc(s.turma || 'Sem turma') : '')+'</span></span></div>'+
+        '<div class="att-btns" role="group" aria-label="Presença de '+esc(s.nome)+'">'+
+          '<button type="button" class="attb p" data-act="att-mark" data-sid="'+k+'" data-v="p" data-key="ap:'+k+'" aria-pressed="'+(v === true)+'">Presente</button>'+
+          '<button type="button" class="attb f" data-act="att-mark" data-sid="'+k+'" data-v="f" data-key="af:'+k+'" aria-pressed="'+(v === false)+'">Falta</button></div></div>';
+    }).join('')+'</div>';
+  }
+  /* resumo do mês */
+  const mAll = D.students.filter(s => s.turma === t.nome && s.ativo !== false);
+  const withMarks = new Set(); D.att.forEach(a => { if (a.t === t.id && a.d.indexOf(ym) === 0) withMarks.add(a.s); });
+  const msd = mAll.concat(D.students.filter(s => withMarks.has(s.id) && !mAll.some(x => x.id === s.id))).sort(byNome);
+  const M = attMonth(D.att, t.id, msd.map(s => s.id), ym);
+  html += '<div class="card att-month"><h3>Resumo de '+esc(monthLabel(ym).toLowerCase())+'</h3>';
+  if (!M.days) html += '<p class="hint">Nenhuma chamada registrada neste mês para a turma '+esc(t.nome)+'.</p>';
+  else {
+    html += '<p class="hint">'+M.days+(M.days === 1 ? ' dia de chamada' : ' dias de chamada')+'. O percentual considera só os dias em que o aluno foi marcado.</p><div class="amt">'+
+      '<div class="amr amh"><span>Aluno</span><span>Pres.</span><span>Faltas</span><span>%</span></div>'+
+      msd.map(s => { const r = M.per[s.id], p = attPct(r); return '<div class="amr"><span class="amn">'+esc(s.nome)+'</span><span>'+r.p+'</span><span>'+r.f+'</span><span class="amp'+(p !== null && p < 60 ? ' low' : '')+'">'+(p === null ? '—' : p+'%')+'</span></div>'; }).join('')+'</div>';
+  }
+  html += '</div>';
+  host.innerHTML = html;
+}
+
 function render(){
   const a = document.activeElement, fk = a && a.dataset ? a.dataset.key : null;
-  renderTbar(); renderChrome(); renderAlunos(); renderTurmas(); renderFinance(); renderPlanning();
+  renderTbar(); renderChrome(); renderAlunos(); renderTurmas(); renderFinance(); renderPlanning(); renderPresenca();
   if (sheet.open && sheet.kind === 'student') refreshPayGrid();
   if (fk) { const el = document.querySelector('[data-key="'+(window.CSS && CSS.escape ? CSS.escape(fk) : fk)+'"]'); if (el && el !== document.activeElement) el.focus({preventScroll:true}); }
 }
@@ -1122,7 +1236,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   let a = el.dataset.act; const id = el.dataset.id;
   if (a === 'hero-cta') a = el.dataset.target;
-  const needsData = ['new-turma','edit-turma','del-turma','plan-reg','new-student','new-event','open-student','toggle-pay','pay-month','del-student','del-lesson','edit-lesson','edit-event','del-event','toggle-ev-pay','open-event'];
+  const needsData = ['new-turma','edit-turma','del-turma','plan-reg','new-student','new-event','open-student','toggle-pay','pay-month','del-student','del-lesson','edit-lesson','edit-event','del-event','toggle-ev-pay','open-event','att-mark','att-all','att-prev','att-next','att-today'];
   if (needsData.indexOf(a) >= 0 && !state.decided) return;
   switch (a) {
     case 'fin-prev': changeFinMonth(-1); break;
@@ -1162,6 +1276,13 @@ document.addEventListener('click', e => {
     case 'cancel-edit': resetLessonForm(); break;
     case 'copy-summary': copySummary(); break;
     case 'export': exportCSV(); break;
+    case 'att-mark': { const t = attTurmaObj(); if (!t) break; const cur = attIndex(data().att).get(attKey(t.id, el.dataset.sid, state.attDate)), want = el.dataset.v === 'p'; act.setAtt(t.id, el.dataset.sid, state.attDate, cur === want ? null : want); break; }
+    case 'att-all': { const t = attTurmaObj(); if (!t) break; const ids = data().students.filter(x => x.turma === t.nome && x.ativo !== false).map(x => x.id); act.allPresent(t.id, ids, state.attDate); break; }
+    case 'att-prev': { const t = attTurmaObj(); if (t) { state.attDate = attNear(t, state.attDate, -1); render(); } break; }
+    case 'att-next': { const t = attTurmaObj(); if (t) { const n = attNear(t, state.attDate, 1), today = isoDate(new Date()); state.attDate = n > today ? today : n; render(); } break; }
+    case 'att-today': state.attDate = isoDate(new Date()); if (state.tab !== 'presenca') { setTab('presenca'); } else render(); break;
+    case 'go-turmas': setTab('turmas'); break;
+    case 'go-turma-att': { const t = (data().turmas || []).find(x => x.nome === el.dataset.name); if (t) { state.attTurma = t.id; state.attDate = isoDate(new Date()); setTab('presenca'); window.scrollTo(0, 0); } break; }
     case 'logout': logout(); break;
     case 'auth-open': openAuth(el.dataset.mode || 'login'); break;
     case 'auth-mode': authSwitch(el.dataset.mode); break;
@@ -1182,7 +1303,11 @@ document.addEventListener('input', e => {
     $$('#ef-list .pick').forEach(r => { r.hidden = !!q && r.dataset.name.indexOf(q) < 0; });
   }
 });
-document.addEventListener('change', e => { if (e.target.classList && e.target.classList.contains('pchk')) updateEfCount(); });
+document.addEventListener('change', e => {
+  if (e.target.classList && e.target.classList.contains('pchk')) updateEfCount();
+  else if (e.target.id === 'att-turma') { state.attTurma = e.target.value; render(); }
+  else if (e.target.id === 'att-date') { const v = e.target.value, today = isoDate(new Date()); if (/^\d{4}-\d{2}-\d{2}$/.test(v)) state.attDate = v > today ? today : v; render(); }
+});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && sheet.open) { closeSheet(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && e.target.closest && e.target.closest('[role="tablist"]')) {
