@@ -30,7 +30,7 @@ O serviço de e-mail padrão do Supabase só envia para membros da sua organiza�
 
 ## Banco de dados
 
-O esquema completo está em `banco/esquema-supabase.sql` e a lista de presença em `banco/presencas.sql` (ambos já aplicados no projeto). Para recriar em outro projeto, cole os dois arquivos, nesta ordem, no **SQL Editor** do Supabase e execute.
+O esquema completo está em `banco/esquema-supabase.sql` e a lista de presença em `banco/presencas.sql` (ambos já aplicados no projeto). As faixas intermediárias (cinza e azul, etc.) exigem rodar uma vez `banco/faixas-intermediarias.sql` em projetos já existentes. Para recriar em outro projeto, cole os dois arquivos, nesta ordem, no **SQL Editor** do Supabase e execute.
 
 ## Teste de isolamento (faça antes de cadastrar alunos de verdade)
 

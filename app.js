@@ -151,8 +151,13 @@ const attPct = r => (r.p + r.f) ? Math.round(r.p / (r.p + r.f) * 100) : null;
 const attRow = (tid, sid, d, p) => ({turma_id:tid, aluno_id:sid, data_aula:d, presente:!!p});
 /* PURE:END */
 
-const BELTS = [['','Sem faixa'],['branca','Branca'],['cinza','Cinza'],['azul','Azul'],['amarela','Amarela'],['laranja','Laranja'],['verde','Verde'],['roxa','Roxa'],['marrom','Marrom'],['preta','Preta']];
+const BELTS = [['','Sem faixa'],['branca','Branca'],['branca-cinza','Branca e cinza'],['cinza','Cinza'],['cinza-azul','Cinza e azul'],['azul','Azul'],['azul-amarela','Azul e amarela'],['amarela','Amarela'],['amarela-laranja','Amarela e laranja'],['laranja','Laranja'],['laranja-verde','Laranja e verde'],['verde','Verde'],['roxa','Roxa'],['marrom','Marrom'],['preta','Preta']];
 const BELT_COLOR = {branca:'#f4f4f2', cinza:'#9aa0a6', azul:'#3b6fd1', amarela:'#f2d03b', laranja:'#f08a2e', verde:'#3f9a52', roxa:'#7b4bb5', marrom:'#7a4a2b', preta:'#151515'};
+/* Faixas intermediárias: BELT_COLOR guarda a 1ª cor e BELT_COLOR2 a 2ª (o anel do avatar vira um degradê). */
+const BELT_COLOR2 = {};
+[['branca-cinza','branca','cinza'],['cinza-azul','cinza','azul'],['azul-amarela','azul','amarela'],['amarela-laranja','amarela','laranja'],['laranja-verde','laranja','verde']].forEach(b => { BELT_COLOR[b[0]] = BELT_COLOR[b[1]]; BELT_COLOR2[b[0]] = BELT_COLOR[b[2]]; });
+const beltStyle = f => f && BELT_COLOR[f] ? ' style="--belt:'+BELT_COLOR[f]+';--belt2:'+(BELT_COLOR2[f] || BELT_COLOR[f])+'"' : '';
+const beltName = f => { const b = BELTS.filter(x => x[0] === f)[0]; return b ? b[1] : cap(f || ''); };
 const ARROW = '<svg class="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg>';
 
 const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -602,7 +607,7 @@ function rowHTML(s, ym, today){
   const btn = st === 'pago'
     ? '<button type="button" class="btn ghost sm" data-act="toggle-pay" data-id="'+k+'" data-key="pay:'+k+'">Desfazer</button>'
     : (st === 'isento' ? '' : '<button type="button" class="btn sm" data-act="toggle-pay" data-id="'+k+'" data-key="pay:'+k+'">Receber</button>');
-  const belt = s.faixa && BELT_COLOR[s.faixa] ? ' style="--belt:'+BELT_COLOR[s.faixa]+'"' : '';
+  const belt = beltStyle(s.faixa);
   return '<div class="row">'+
     '<button type="button" class="who" data-act="open-student" data-id="'+k+'" data-key="open:'+k+'" aria-label="Abrir ficha de '+esc(s.nome)+'">'+
       '<span class="avatar"'+belt+' aria-hidden="true">'+esc(initials(s.nome))+'</span>'+
@@ -617,9 +622,9 @@ function alunoRowHTML(s, ym, today){
   const st = statusOf(s, ym, today);
   const pillTxt = {pago:'Pagou', pendente:'A vencer', atrasado:'Em atraso', isento:'Isento'}[st];
   const k = esc(s.id), age = ageOf(s.nasc, today);
-  const belt = s.faixa && BELT_COLOR[s.faixa] ? ' style="--belt:'+BELT_COLOR[s.faixa]+'"' : '';
+  const belt = beltStyle(s.faixa);
   const meta = [s.turma ? '<span class="tl">'+tdot(s.turma)+esc(s.turma)+'</span>' : 'Sem turma'];
-  if (s.faixa && BELT_COLOR[s.faixa]) meta.push('faixa '+esc(s.faixa));
+  if (s.faixa && BELT_COLOR[s.faixa]) meta.push('faixa '+esc(beltName(s.faixa).toLowerCase()));
   if (age != null) meta.push(age+' anos');
   if (s.ativo === false) meta.push('inativo');
   const info = [];
@@ -667,7 +672,7 @@ function partRowsHTML(ev, today){
   return '<div class="prows">'+rows.map(r => {
     const k = 'ep:'+esc(ev.id)+':'+esc(r.s.id);
     const btn = r.st === 'isento' ? '' : '<button type="button" class="btn sm'+(r.st === 'pago' ? ' ghost' : '')+'" data-act="toggle-ev-pay" data-ev="'+esc(ev.id)+'" data-sid="'+esc(r.s.id)+'" data-key="'+k+'">'+(r.st === 'pago' ? 'Desfazer' : 'Receber')+'</button>';
-    const belt = r.s.faixa && BELT_COLOR[r.s.faixa] ? ' style="--belt:'+BELT_COLOR[r.s.faixa]+'"' : '';
+    const belt = beltStyle(r.s.faixa);
     return '<div class="prow"><span class="avatar sm"'+belt+' aria-hidden="true">'+esc(initials(r.s.nome))+'</span>'+
       '<span class="p-name">'+esc(r.s.nome)+'<em>'+esc(r.s.turma || 'Sem turma')+'</em></span>'+
       '<span class="pill '+r.st+'">'+pillTxt[r.st]+'</span>'+btn+'</div>';
@@ -900,9 +905,9 @@ function renderPresenca(){
   } else {
     html += '<div class="mini"><div><b>'+cc.p+'</b><span>'+(cc.p === 1 ? 'presente' : 'presentes')+'</span></div><div><b>'+cc.f+'</b><span>'+(cc.f === 1 ? 'falta' : 'faltas')+'</span></div><div><b>'+cc.n+'</b><span>sem registro</span></div></div>';
     html += '<div class="card list">'+day.map(s => {
-      const v = idx.get(attKey(t.id, s.id, d)), k = esc(s.id), belt = s.faixa && BELT_COLOR[s.faixa] ? ' style="--belt:'+BELT_COLOR[s.faixa]+'"' : '';
+      const v = idx.get(attKey(t.id, s.id, d)), k = esc(s.id), belt = beltStyle(s.faixa);
       return '<div class="row att-row"><div class="who static"><span class="avatar"'+belt+' aria-hidden="true">'+esc(initials(s.nome))+'</span>'+
-        '<span class="who-txt"><strong>'+esc(s.nome)+'</strong><span class="meta">'+(s.faixa ? esc(cap(s.faixa)) : 'Sem faixa')+(s.turma !== t.nome ? ' · '+esc(s.turma || 'Sem turma') : '')+'</span></span></div>'+
+        '<span class="who-txt"><strong>'+esc(s.nome)+'</strong><span class="meta">'+(s.faixa ? esc(beltName(s.faixa)) : 'Sem faixa')+(s.turma !== t.nome ? ' · '+esc(s.turma || 'Sem turma') : '')+'</span></span></div>'+
         '<div class="att-btns" role="group" aria-label="Presença de '+esc(s.nome)+'">'+
           '<button type="button" class="attb p" data-act="att-mark" data-sid="'+k+'" data-v="p" data-key="ap:'+k+'" aria-pressed="'+(v === true)+'">Presente</button>'+
           '<button type="button" class="attb f" data-act="att-mark" data-sid="'+k+'" data-v="f" data-key="af:'+k+'" aria-pressed="'+(v === false)+'">Falta</button></div></div>';
@@ -1028,7 +1033,7 @@ function eventSheetHTML(v, isEdit){
   const list = D.students.filter(s => s.ativo !== false || parts[s.id]).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   const ts = Array.from(new Set(list.map(s => s.turma).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const picks = list.length ? list.map(s => {
-    const p = parts[s.id], paid = !!(p && p.pago), belt = s.faixa && BELT_COLOR[s.faixa] ? ' style="--belt:'+BELT_COLOR[s.faixa]+'"' : '';
+    const p = parts[s.id], paid = !!(p && p.pago), belt = beltStyle(s.faixa);
     return '<label class="prow pick" data-name="'+esc(fold(s.nome))+'" data-turma="'+esc(s.turma || '')+'"><input type="checkbox" class="pchk" value="'+esc(s.id)+'"'+(p ? ' checked' : '')+(paid ? ' disabled' : '')+'>'+
       '<span class="avatar sm"'+belt+' aria-hidden="true">'+esc(initials(s.nome))+'</span><span class="p-name">'+esc(s.nome)+'<em>'+esc(s.turma || 'Sem turma')+'</em></span>'+(paid ? '<span class="pill pago">Pago</span>' : '')+'</label>';
   }).join('') : '<p class="hint" style="padding:10px 0">Cadastre alunos na aba Alunos para inscrevê-los em eventos.</p>';
