@@ -171,7 +171,7 @@ const TABS = ['alunos','turmas','presenca','financeiro','planejamento'];
 const now0 = new Date();
 const state = {
   tab:'alunos', students:[], lessons:[], events:[], turmas:[], att:[], attTurma:'', attDate: isoDate(now0), turma:'', meName:'', user:null,
-  decided:false, demo:false, loadError:false,
+  decided:false, demo:false, loadError:false, stale:false, reconnecting:false, unsynced:false,
   finMonth: ymOf(now0), planMonth: ymOf(now0), selDay: isoDate(now0),
   finFilter:'todos', finQuery:'', alFilter:'todos', alQuery:'', editLesson:null, lastTurma:''
 };
@@ -205,7 +205,8 @@ function toast(msg){
 /* ---------- conta e banco de dados (Supabase) ---------- */
 const SB_URL = 'https://ulmiqpjwcbxnuoipwuxx.supabase.co';
 const SB_KEY = 'sb_publishable_Ute6F7Dcmy4AnrDzYpj7ZA_S58JgMqT';
-let sb = null, store = null, chain = Promise.resolve(), loadedAt = 0;
+let sb = null, store = null, chain = Promise.resolve(), loadedAt = 0, mutSeq = 0, olderLoaded = false;
+const attDirty = new Set();
 const siteURL = () => location.origin + location.pathname;
 
 function errMsg(e){
@@ -213,13 +214,14 @@ function errMsg(e){
   if (!navigator.onLine || /failed to fetch|networkerror|load failed|network request failed/i.test(m)) return 'Sem conexão. Verifique a internet e tente de novo.';
   if (c === '23505') return 'Já existe um registro com esse nome.';
   if (c === '23514' || c === '22001' || c === '22007' || c === '22P02') return 'Algum campo tem um valor fora do permitido.';
-  if (c === '42501' || c === 'PGRST301' || /jwt/i.test(m)) return 'Sua sessão expirou. Saia e entre de novo.';
+  if (c === '42501' || c === 'PGRST301' || /jwt/i.test(m)) return 'Não foi possível confirmar a sua conta agora. Aguarde um instante e tente de novo.';
   return 'Não foi possível salvar agora. Tente de novo.';
 }
 async function run(q){ const r = await q; if (r.error) throw r.error; return r.data; }
 const isNetErr = e => !!e && (e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String(e.message || '')));
 
 function enqueue(fn){
+  mutSeq++;
   chain = chain.then(async () => {
     try { await fn(); }
     catch (e) {
@@ -233,27 +235,66 @@ function enqueue(fn){
   return chain;
 }
 
+/* Baixa a tabela inteira. A primeira página sai sozinha; se vier cheia, as próximas saem 3 de cada vez. */
 async function fetchAll(table, mod){
-  const out = [];
-  for (let from = 0; ; from += 1000) {
-    let q = sb.from(table).select('*');
-    if (mod) q = mod(q);
-    const rows = await run(q.order('id').range(from, from + 999));
-    out.push.apply(out, rows);
-    if (rows.length < 1000) break;
+  const PAGE = 1000;
+  const page = i => { let q = sb.from(table).select('*'); if (mod) q = mod(q); return run(q.order('id').range(i*PAGE, i*PAGE + PAGE - 1)); };
+  const out = await page(0);
+  for (let i = 1; out.length === i*PAGE; i += 3) {
+    const rs = await Promise.all([page(i), page(i+1), page(i+2)]);
+    rs.forEach(r => { out.push.apply(out, r); });
+    if (rs[2].length < PAGE) break;
   }
   return out;
 }
-async function loadAll(){
-  const r = await Promise.all(['turmas','alunos','pagamentos','aulas','eventos','inscricoes'].map(t => fetchAll(t)).concat([fetchAll('presencas', q => q.gte('data_aula', attMin()))]));
+/* Presenças: só o mês passado e o atual vêm na abertura; o restante chega depois, em segundo plano. */
+const attRecent = () => { const x = new Date(); x.setDate(1); x.setMonth(x.getMonth()-1); return isoDate(x); };
+async function fetchRows(from){
+  const r = await Promise.all(['turmas','alunos','pagamentos','aulas','eventos','inscricoes'].map(t => fetchAll(t)).concat([fetchAll('presencas', q => q.gte('data_aula', from))]));
+  return {turmas:r[0], alunos:r[1], pagamentos:r[2], aulas:r[3], eventos:r[4], inscricoes:r[5], presencas:r[6]};
+}
+
+/* Cópia dos últimos dados baixados, guardada neste aparelho: o app abre na hora e atualiza por trás. Apagada ao sair da conta. */
+const CACHE_KEY = 'caderno-sensei:dados:v1';
+function readCache(userId){
+  try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return c && c.uid === userId && c.rows ? c : null; } catch (e) { return null; }
+}
+function writeCache(userId, rows){
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({uid:userId, at:Date.now(), rows:rows})); } catch (e) { try { localStorage.removeItem(CACHE_KEY); } catch (x) {} }
+}
+function clearCache(){ try { localStorage.removeItem(CACHE_KEY); } catch (e) {} }
+
+async function syncNow(){
+  const seq = mutSeq, from = attRecent(), rows = await fetchRows(from);
+  if (seq !== mutSeq || !state.user) return false;   /* houve edição durante o download: esta cópia pode estar defasada */
+  const d = fromRows(rows);
+  state.students = d.students; state.lessons = d.lessons; state.events = d.events; state.turmas = d.turmas;
+  state.att = d.att.concat(state.att.filter(a => a.d < from));
+  state.loadError = false; state.stale = false; state.unsynced = false;
   loadedAt = Date.now();
-  return fromRows({turmas:r[0], alunos:r[1], pagamentos:r[2], aulas:r[3], eventos:r[4], inscricoes:r[5], presencas:r[6]});
+  writeCache(state.user.id, rows);
+  render();
+  loadOlderAtt();
+  return true;
 }
 async function reload(){
   if (!sb || !state.user) return;
-  const d = await loadAll();
-  state.students = d.students; state.lessons = d.lessons; state.events = d.events; state.turmas = d.turmas; state.att = d.att;
-  render();
+  if (!(await syncNow())) await syncNow();
+}
+async function loadOlderAtt(){
+  if (olderLoaded || !sb || !state.user || state.demo) return;
+  olderLoaded = true;
+  const who = state.user.id, from = attRecent();
+  try {
+    const rows = await fetchAll('presencas', q => q.gte('data_aula', attMin()).lt('data_aula', from));
+    if (!state.user || state.user.id !== who) return;
+    const have = new Set(state.att.map(a => attKey(a.t, a.s, a.d)));
+    rows.forEach(r => {
+      const a = {t:r.turma_id, s:r.aluno_id, d:String(r.data_aula).slice(0,10), p:!!r.presente}, k = attKey(a.t, a.s, a.d);
+      if (!have.has(k) && !attDirty.has(k)) state.att.push(a);
+    });
+    if (!sheet.open) render();
+  } catch (e) { olderLoaded = false; console.error(e); }
 }
 
 const attMin = () => { const x = new Date(); x.setDate(x.getDate()-400); return isoDate(x); };
@@ -303,13 +344,14 @@ const act = {
   delEvent(i){ const D = data(); D.events = D.events.filter(x => x.id !== i); render(); return state.demo ? Promise.resolve() : store.delEvent(i); },
   setAtt(t, sid, d, p){
     const D = data();
+    attDirty.add(attKey(t, sid, d));
     D.att = D.att.filter(a => !(a.t === t && a.s === sid && a.d === d));
     if (p !== null) D.att.push({t:t, s:sid, d:d, p:p});
     render(); return state.demo ? Promise.resolve() : store.setAtt(t, sid, d, p);
   },
   allPresent(t, sids, d){
     const D = data(), idx = attIndex(D.att), rows = [];
-    sids.forEach(sid => { if (idx.get(attKey(t, sid, d)) !== true) { D.att = D.att.filter(a => !(a.t === t && a.s === sid && a.d === d)); D.att.push({t:t, s:sid, d:d, p:true}); rows.push(attRow(t, sid, d, true)); } });
+    sids.forEach(sid => { if (idx.get(attKey(t, sid, d)) !== true) { attDirty.add(attKey(t, sid, d)); D.att = D.att.filter(a => !(a.t === t && a.s === sid && a.d === d)); D.att.push({t:t, s:sid, d:d, p:true}); rows.push(attRow(t, sid, d, true)); } });
     render(); return (state.demo || !rows.length) ? Promise.resolve() : store.setAttMany(rows);
   },
   async saveTurma(t, oldName){
@@ -339,25 +381,80 @@ const act = {
 const emptyData = () => ({students:[], lessons:[], events:[], turmas:[], att:[]});
 async function enterApp(user){
   if (sheet.open) closeSheet();
-  Object.assign(state, emptyData(), {user:user, meName:(user.user_metadata && user.user_metadata.nome) || '', demo:false, decided:false, loadError:false, turma:''});
-  demoData = emptyData();
+  const c = readCache(user.id);
+  Object.assign(state, emptyData(), {user:user, meName:(user.user_metadata && user.user_metadata.nome) || '', demo:false, decided:false, loadError:false, stale:false, reconnecting:false, unsynced:false, turma:''});
+  if (c) Object.assign(state, fromRows(c.rows), {decided:true});   /* mostra o que estava salvo enquanto atualiza */
+  demoData = emptyData(); olderLoaded = false; attDirty.clear();
   render();
-  try { Object.assign(state, await loadAll()); }
-  catch (e) { console.error(e); state.loadError = true; toast(errMsg(e)); }
+  try { await reload(); }
+  catch (e) { console.error(e); state.loadError = true; state.stale = !!c; toast(errMsg(e)); }
   state.decided = true; resetLessonForm(); render();
 }
 function leaveApp(){
-  Object.assign(state, emptyData(), {user:null, meName:'', demo:true, decided:true, loadError:false, turma:''});
+  clearCache();
+  Object.assign(state, emptyData(), {user:null, meName:'', demo:true, decided:true, loadError:false, stale:false, reconnecting:false, unsynced:false, turma:''});
   demoData = makeDemo();
   if (sheet.open) closeSheet();
   resetLessonForm(); render();
   openAuth('login');
 }
+
+/* Sessão guardada no aparelho (o Supabase grava aqui o login). Enquanto ela existir, o professor continua logado. */
+const SB_AUTH_KEY = 'sb-'+SB_URL.replace(/^https?:\/\//, '').split('.')[0]+'-auth-token';
+function peekSession(){
+  try { const x = JSON.parse(localStorage.getItem(SB_AUTH_KEY) || 'null'); return x && x.refresh_token ? x : null; } catch (e) { return null; }
+}
+let resuming = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+/* Abriu sem sinal (ou com sinal fraco): a conta continua salva, então não pede login. Tenta renovar até conseguir. */
+async function resumeSession(){
+  if (resuming || !sb) return;
+  resuming = true;
+  try {
+    for (let i = 0; i < 10; i++) {
+      const ps = peekSession();
+      if (!ps) { leaveApp(); return; }
+      if (!state.reconnecting) { state.reconnecting = true; render(); }
+      try {
+        const res = await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token', {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json'}, body:JSON.stringify({refresh_token:ps.refresh_token})});
+        if (res.ok) {
+          const t = await res.json();
+          const saved = Object.assign({}, ps, {access_token:t.access_token, refresh_token:t.refresh_token, token_type:t.token_type || 'bearer', expires_in:t.expires_in, expires_at:t.expires_at || (Math.floor(Date.now()/1000) + (t.expires_in || 3600)), user:t.user || ps.user});
+          localStorage.setItem(SB_AUTH_KEY, JSON.stringify(saved));
+          const r = await sb.auth.getSession();
+          if (r.data && r.data.session) { await onSession(r.data.session); return; }
+        } else if (res.status === 400 || res.status === 401 || res.status === 403) {
+          /* o servidor recusou o login guardado (trocou a senha, saiu em outro lugar...): aí sim, pede para entrar */
+          try { await sb.auth.signOut({scope:'local'}); } catch (e) {}
+          leaveApp(); return;
+        }
+      } catch (e) { /* sem rede agora; tenta de novo */ }
+      await sleep(Math.min(2000*(i+1), 12000));
+    }
+  } finally { resuming = false; }
+}
+async function onSession(session){
+  const u = session.user;
+  state.reconnecting = false;
+  if (state.user && state.user.id === u.id) {
+    state.user = u;
+    if (state.unsynced) {
+      try { await reload(); }
+      catch (e) { console.error(e); state.loadError = true; state.stale = true; toast(errMsg(e)); }
+      render();
+    } else render();
+    return;
+  }
+  await enterApp(u);
+}
 async function onAuth(ev, session){
   if (ev === 'SIGNED_OUT') { leaveApp(); return; }
-  if (!session) { if (ev === 'INITIAL_SESSION') leaveApp(); return; }
-  if (ev === 'TOKEN_REFRESHED' || ev === 'USER_UPDATED') { state.user = session.user; return; }
-  if (!state.user || state.user.id !== session.user.id) await enterApp(session.user);
+  if (!session) {
+    if (ev === 'INITIAL_SESSION') { if (peekSession()) resumeSession(); else leaveApp(); }
+    return;
+  }
+  if ((ev === 'TOKEN_REFRESHED' || ev === 'USER_UPDATED') && state.user && state.user.id === session.user.id && !state.unsynced && !state.reconnecting) { state.user = session.user; return; }
+  await onSession(session);
   if (ev === 'PASSWORD_RECOVERY') openAuth('reset');
 }
 function authMsg(e){
@@ -546,9 +643,12 @@ function renderChrome(){
   else n.textContent = (state.meName ? 'Olá, '+state.meName.split(' ')[0]+' · ' : '')+'seus dados ficam privados na sua conta';
   $('#logout-btn').hidden = !state.user;
   const bn = $('#demo-banner');
-  bn.hidden = !(state.demo || state.loadError);
-  if (state.loadError) {
-    $('#banner-msg').textContent = 'Não foi possível carregar os seus dados.';
+  bn.hidden = !(state.demo || state.loadError || state.reconnecting);
+  if (state.reconnecting) {
+    $('#banner-msg').textContent = 'Sem conexão com a sua conta. Você continua logado; tentando reconectar…';
+    $('#banner-acts').innerHTML = '<button type="button" class="btn sm" data-act="retry-session">Tentar agora</button>';
+  } else if (state.loadError) {
+    $('#banner-msg').textContent = state.stale ? 'Sem conexão. Você está vendo os últimos dados salvos neste celular.' : 'Não foi possível carregar os seus dados.';
     $('#banner-acts').innerHTML = '<button type="button" class="btn sm" data-act="retry-load">Tentar de novo</button>';
   } else {
     $('#banner-msg').textContent = 'Você está vendo dados de exemplo, que não são salvos. Crie sua conta para cadastrar seus alunos.';
@@ -1292,6 +1392,7 @@ document.addEventListener('click', e => {
     case 'auth-open': openAuth(el.dataset.mode || 'login'); break;
     case 'auth-mode': authSwitch(el.dataset.mode); break;
     case 'retry-load': if (state.user) enterApp(state.user); break;
+    case 'retry-session': resumeSession(); break;
   }
 });
 document.addEventListener('submit', e => {
@@ -1353,9 +1454,20 @@ function boot(){
   } catch(e){}
   if (!window.supabase || !window.supabase.createClient) { startDemo(); toast('Não foi possível carregar o sistema de contas. Verifique a conexão e recarregue a página.'); return; }
   sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}});
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch(e){}
+  /* Já tem conta guardada neste aparelho? Mostra os últimos dados na hora, sem esperar a rede. */
+  try {
+    const ps = peekSession(), c = ps && ps.user && readCache(ps.user.id);
+    if (c) {
+      Object.assign(state, emptyData(), fromRows(c.rows), {user:ps.user, meName:(ps.user.user_metadata && ps.user.user_metadata.nome) || '', demo:false, decided:true, loadError:false, stale:false, unsynced:true, turma:''});
+      demoData = emptyData(); render();
+    }
+  } catch(e){ console.error(e); }
   sb.auth.onAuthStateChange((ev, session) => { setTimeout(() => { onAuth(ev, session); }, 0); });
+  window.addEventListener('online', () => { if (state.reconnecting) resumeSession(); });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || !state.user || !state.decided || sheet.open || state.loadError) return;
+    if (document.visibilityState === 'visible' && state.reconnecting) { resumeSession(); return; }
+    if (document.visibilityState !== 'visible' || !state.user || !state.decided || sheet.open || state.loadError || state.unsynced) return;
     if (Date.now() - loadedAt < 30000) return;
     chain.then(() => reload()).catch(() => {});
   });
