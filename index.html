@@ -186,6 +186,18 @@
       <div class="head-actions"><span class="hint" id="ev-fin-sum"></span></div>
     </div>
     <div class="ev-fin" id="ev-fin"></div>
+
+    <div class="card xl-card">
+      <div class="xl-txt">
+        <p class="eyebrow">Levar para o Excel</p>
+        <h2 class="h2s">Planilha do mês</h2>
+        <p class="hint">Baixa um arquivo do Excel com o financeiro de <span id="xl-month"></span>: o resumo, quem pagou, quem está em atraso, quem ainda vai vencer e os pagamentos de eventos.</p>
+      </div>
+      <button type="button" class="btn" id="export-xlsx-btn" data-act="export-xlsx">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19h16"/></svg>
+        Baixar planilha do Excel
+      </button>
+    </div>
   </section>
 
   <section id="panel-planejamento" role="tabpanel" aria-labelledby="tab-planejamento" hidden>
@@ -265,6 +277,7 @@
 
 
 <script src="vendor/supabase.js"></script>
+<script src="xlsx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

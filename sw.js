@@ -3,8 +3,8 @@
    - o resto (index, app.js, styles): tenta a internet, mas se ela demorar mais de 3 segundos abre a cópia salva,
      então o app não fica travado com sinal fraco. A cópia nova é guardada para a próxima abertura.
    Os dados dos alunos ficam só no banco. */
-const CACHE = 'caderno-sensei-v4';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'caderno-sensei-v5';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'xlsx.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 const STATIC = /\/(vendor|icons)\//;
 const WAIT = 3000;
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

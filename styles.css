@@ -255,6 +255,12 @@ main.wrap{padding-block:12px 80px}
 .sub-h{font-size:13px;letter-spacing:.04em;color:var(--muted);font-weight:600}
 .evt-acts{display:flex;flex-wrap:wrap;gap:8px}
 .ev-fin{display:flex;flex-direction:column;gap:14px}
+.xl-card{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:20px 28px;padding:24px 26px;margin-top:44px}
+.xl-txt{flex:1 1 320px;min-width:0}
+.xl-txt .eyebrow{margin:0 0 8px}
+.xl-txt .h2s{font-size:clamp(24px,4vw,34px);margin:0 0 8px}
+.xl-txt .hint{margin:0;max-width:56ch}
+.xl-card .btn{flex:0 0 auto}
 
 /* ---------- planejamento ---------- */
 .plan-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:start;margin-top:30px}

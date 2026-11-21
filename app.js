@@ -806,6 +806,7 @@ function eventHTML(ev, mode){
 function renderFinance(){
   const D = data(), ym = state.finMonth, today = isoDate(new Date());
   $('#fin-label').textContent = monthLabel(ym);
+  $('#xl-month').textContent = monthLabel(ym).toLowerCase();
   const S = D.students.filter(inTurma), all = rowsFor(S, ym), t = totalsFor(all, ym, today);
 
   $('#kpis').innerHTML =
@@ -1313,6 +1314,115 @@ function exportCSV(){
   } catch (e) { toast('Não foi possível exportar agora.'); }
 }
 
+/* planilha do Excel (.xlsx) do financeiro do mês: aba Resumo, aba Mensalidades e (se houver) aba Eventos */
+function exportXLSX(){
+  const X = window.MiniXLSX;
+  if (!X) { toast('Não foi possível gerar a planilha agora. Atualize a página e tente de novo.'); return; }
+  const D = data(), ym = state.finMonth, today = isoDate(new Date());
+  const S = D.students.filter(inTurma), valid = validIds(), byId = {};
+  D.students.forEach(s => { byId[s.id] = s; });
+  const rank = {atrasado:0, pendente:1, isento:2, pago:3};
+  const mensLabel = {pago:'Pago', pendente:'A vencer', atrasado:'Em atraso', isento:'Isento'};
+  const evLabelSt = {pago:'Pago', pendente:'A pagar', atrasado:'Em atraso', isento:'Sem taxa'};
+  const cls = st => st;           /* o nome do estilo de cor é o próprio código da situação */
+  const dt = iso => iso ? {v:X.serial(iso), s:'date'} : {v:null, s:'date'};
+  const MAXR = 2000;              /* as fórmulas do Resumo olham até esta linha, para valer também para linhas que a pessoa acrescentar */
+
+  const rows = rowsFor(S, ym).sort((a, b) => rank[statusOf(a, ym, today)] - rank[statusOf(b, ym, today)] || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const evs = visEvents().filter(e => e.date.slice(0,7) === ym || String(e.prazo || '').slice(0,7) === ym).sort(cmpEvent);
+  const evRows = [];
+  evs.forEach(e => {
+    Object.keys(e.participantes || {}).filter(id => valid.has(id) && byId[id]).map(id => byId[id])
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      .forEach(s => evRows.push({e:e, s:s, p:e.participantes[s.id] || {}, st:evPartStatus(e, s.id, today)}));
+  });
+  if (!rows.length && !evRows.length) { toast('Não há mensalidades nem eventos neste mês para exportar.'); return; }
+
+  const when = monthLabel(ym), turmaTxt = state.turma ? 'Turma: '+state.turma : 'Todas as turmas';
+  const nowTxt = new Date().toLocaleDateString('pt-BR')+' às '+new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
+  /* --- aba Mensalidades --- */
+  const mHead = ['Aluno','Turma','Responsável','Telefone','Vencimento','Valor da mensalidade','Situação','Pago em','Valor pago'];
+  const mRows = [
+    [{v:'Mensalidades — '+when, s:'title'}],
+    [{v:turmaTxt+'. Dica: clique na setinha de “Situação” para ver só quem pagou ou só quem está devendo.', s:'muted'}],
+    [],
+    mHead.map(h => ({v:h, s:'head'}))
+  ];
+  const t = {pago:{n:0, v:0}, pendente:{n:0, v:0}, atrasado:{n:0, v:0}, isento:{n:0, v:0}};
+  rows.forEach(s => {
+    const st = statusOf(s, ym, today), p = s.pay && s.pay[ym], valor = +s.valor || (p ? +p.v || 0 : 0);
+    if (st === 'pago') { t.pago.n++; t.pago.v += (+p.v || 0); }
+    else { t[st].n++; t[st].v += (+s.valor || 0); }
+    mRows.push([
+      {v:s.nome, s:'text'}, {v:s.turma || '', s:'text'}, {v:s.mae || s.pai || '', s:'text'}, {v:s.tel || '', s:'text'},
+      dt(dueDate(s, ym)), {v:valor, s:'money'}, {v:mensLabel[st], s:cls(st)},
+      dt(p && p.d ? p.d : ''), p ? {v:+p.v || 0, s:'money'} : {v:null, s:'money'}
+    ]);
+  });
+  const mLast = Math.max(5, 4 + rows.length);
+
+  /* --- aba Eventos (só se houver inscritos) --- */
+  const eHead = ['Evento','Tipo','Data do evento','Prazo de pagamento','Aluno','Turma','Taxa','Situação','Pago em','Valor pago'];
+  const eRows = [
+    [{v:'Pagamentos de eventos — '+when, s:'title'}],
+    [{v:turmaTxt+'. Eventos que acontecem ou vencem neste mês.', s:'muted'}],
+    [],
+    eHead.map(h => ({v:h, s:'head'}))
+  ];
+  const te = {pago:{n:0, v:0}, pendente:{n:0, v:0}, atrasado:{n:0, v:0}, isento:{n:0, v:0}};
+  evRows.forEach(r => {
+    const taxa = +r.e.taxa || 0;
+    if (r.st === 'pago') { te.pago.n++; te.pago.v += (+r.p.v || 0); }
+    else { te[r.st].n++; te[r.st].v += taxa; }
+    eRows.push([
+      {v:r.e.titulo, s:'text'}, {v:evLabel(r.e), s:'text'}, dt(r.e.date), dt(r.e.prazo || ''), {v:r.s.nome, s:'text'}, {v:r.s.turma || '', s:'text'},
+      {v:taxa, s:'money'}, {v:evLabelSt[r.st], s:cls(r.st)}, dt(r.p.em || ''), r.p.pago ? {v:+r.p.v || 0, s:'money'} : {v:null, s:'money'}
+    ]);
+  });
+  const eLast = Math.max(5, 4 + evRows.length);
+
+  /* --- aba Resumo (fórmulas olham as outras abas; assim, se a pessoa mudar uma situação, os totais acompanham) --- */
+  const M = (col) => 'Mensalidades!$'+col+'$5:$'+col+'$'+MAXR;
+  const E = (col) => 'Eventos!$'+col+'$5:$'+col+'$'+MAXR;
+  const expected = t.pago.v + t.pendente.v + t.atrasado.v;
+  const sum = [
+    [{v:'Financeiro — '+when, s:'title'}],
+    [{v:turmaTxt+'. Gerado em '+nowTxt+'.', s:'muted'}],
+    [],
+    [{v:'Mensalidades', s:'section'}],
+    [{v:'Situação', s:'head'}, {v:'Alunos', s:'head'}, {v:'Valor', s:'head'}],
+    [{v:'Pagaram', s:'pago'}, {v:t.pago.n, s:'int', f:'COUNTIF('+M('G')+',"Pago")'}, {v:t.pago.v, s:'money', f:'SUMIF('+M('G')+',"Pago",'+M('I')+')'}],
+    [{v:'A vencer', s:'pendente'}, {v:t.pendente.n, s:'int', f:'COUNTIF('+M('G')+',"A vencer")'}, {v:t.pendente.v, s:'money', f:'SUMIF('+M('G')+',"A vencer",'+M('F')+')'}],
+    [{v:'Em atraso', s:'atrasado'}, {v:t.atrasado.n, s:'int', f:'COUNTIF('+M('G')+',"Em atraso")'}, {v:t.atrasado.v, s:'money', f:'SUMIF('+M('G')+',"Em atraso",'+M('F')+')'}],
+    [{v:'Isento', s:'isento'}, {v:t.isento.n, s:'int', f:'COUNTIF('+M('G')+',"Isento")'}, {v:0, s:'money'}],
+    [{v:'Previsto no mês', s:'totalLabel'}, {v:t.pago.n+t.pendente.n+t.atrasado.n+t.isento.n, s:'totalInt', f:'SUM(B6:B9)'}, {v:expected, s:'totalMoney', f:'SUM(C6:C9)'}],
+    [{v:'Já recebido (%)', s:'label'}, {v:expected ? t.pago.v/expected : 0, s:'bigPct', f:'IF(C10=0,0,C6/C10)'}]
+  ];
+  if (evRows.length) {
+    const eExp = te.pago.v + te.pendente.v + te.atrasado.v;
+    sum.push([], [{v:'Eventos (competições e exames)', s:'section'}],
+      [{v:'Situação', s:'head'}, {v:'Inscritos', s:'head'}, {v:'Valor', s:'head'}],
+      [{v:'Pagaram', s:'pago'}, {v:te.pago.n, s:'int', f:'COUNTIF('+E('H')+',"Pago")'}, {v:te.pago.v, s:'money', f:'SUMIF('+E('H')+',"Pago",'+E('J')+')'}],
+      [{v:'A pagar', s:'pendente'}, {v:te.pendente.n, s:'int', f:'COUNTIF('+E('H')+',"A pagar")'}, {v:te.pendente.v, s:'money', f:'SUMIF('+E('H')+',"A pagar",'+E('G')+')'}],
+      [{v:'Em atraso', s:'atrasado'}, {v:te.atrasado.n, s:'int', f:'COUNTIF('+E('H')+',"Em atraso")'}, {v:te.atrasado.v, s:'money', f:'SUMIF('+E('H')+',"Em atraso",'+E('G')+')'}],
+      [{v:'Sem taxa', s:'isento'}, {v:te.isento.n, s:'int', f:'COUNTIF('+E('H')+',"Sem taxa")'}, {v:0, s:'money'}],
+      [{v:'Previsto em eventos', s:'totalLabel'}, {v:te.pago.n+te.pendente.n+te.atrasado.n+te.isento.n, s:'totalInt', f:'SUM(B15:B18)'}, {v:eExp, s:'totalMoney', f:'SUM(C15:C18)'}]);
+  }
+
+  const sheets = [{name:'Resumo', rows:sum, cols:[34, 14, 18], hideGrid:true}];
+  sheets.push({name:'Mensalidades', rows:mRows, cols:[32, 18, 26, 18, 14, 18, 14, 14, 16], headRow:4, freezeRow:4, filter:'A4:I'+mLast, landscape:true});
+  if (evRows.length) sheets.push({name:'Eventos', rows:eRows, cols:[30, 16, 15, 17, 30, 18, 14, 14, 14, 16], headRow:4, freezeRow:4, filter:'A4:J'+eLast, landscape:true});
+
+  try {
+    const fname = 'financeiro-'+ym+(state.turma ? '-'+fold(state.turma).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : '')+'.xlsx';
+    const blob = new Blob([X.build(sheets)], {type:X.mime});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Planilha pronta: '+fname+'. Ela está na pasta de downloads.');
+  } catch (e) { toast('Não foi possível gerar a planilha agora.'); }
+}
+
 /* ---------- eventos de interface ---------- */
 function setTab(t){
   if (TABS.indexOf(t) < 0) return;
@@ -1381,6 +1491,7 @@ document.addEventListener('click', e => {
     case 'cancel-edit': resetLessonForm(); break;
     case 'copy-summary': copySummary(); break;
     case 'export': exportCSV(); break;
+    case 'export-xlsx': exportXLSX(); break;
     case 'att-mark': { const t = attTurmaObj(); if (!t) break; const cur = attIndex(data().att).get(attKey(t.id, el.dataset.sid, state.attDate)), want = el.dataset.v === 'p'; act.setAtt(t.id, el.dataset.sid, state.attDate, cur === want ? null : want); break; }
     case 'att-all': { const t = attTurmaObj(); if (!t) break; const ids = data().students.filter(x => x.turma === t.nome && x.ativo !== false).map(x => x.id); act.allPresent(t.id, ids, state.attDate); break; }
     case 'att-prev': { const t = attTurmaObj(); if (t) { state.attDate = attNear(t, state.attDate, -1); render(); } break; }

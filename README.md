@@ -44,6 +44,7 @@ O esquema completo está em `banco/esquema-supabase.sql` e a lista de presença 
 |---|---|
 | `index.html`, `styles.css` | Estrutura e visual |
 | `app.js` | Telas, regras e comunicação com o Supabase |
+| `xlsx.js` | Gerador de planilha do Excel (.xlsx) usado no botão "Baixar planilha do Excel" da aba Finanças |
 | `vendor/supabase.js` | Biblioteca oficial `@supabase/supabase-js` 2.117.3 (cópia local) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Instalação como aplicativo e abertura sem sinal (os dados continuam exigindo internet) |
 | `banco/esquema-supabase.sql` | Tabelas, regras de acesso e gatilho de cadastro |
