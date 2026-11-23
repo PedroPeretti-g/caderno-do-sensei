@@ -19,7 +19,7 @@ Aplicativo web (PWA) estático, sem build: HTML + CSS + JavaScript puro. Cada pr
 |---|---|
 | `index.html`, `styles.css` | Estrutura e visual (uma seção `#panel-...` por aba) |
 | `app.js` | Todo o app, dentro de uma função anônima. Seções marcadas com `/* ---------- nome ---------- */` (conta e banco, entrar/sair, exemplos, renderização, presença, ficha do aluno, eventos, turmas, aulas, resumo/cópia/exportação, eventos de interface, início) |
-| `xlsx.js` | Gerador de planilha `.xlsx` feito à mão (sem biblioteca): monta o zip + XML. API: `MiniXLSX.build(sheets)`, `MiniXLSX.serial(iso)`, `MiniXLSX.mime` |
+| `planilha.js` | Gerador de planilha `.xlsx` feito à mão (sem biblioteca): monta o zip + XML. API: `MiniXLSX.build(sheets)`, `MiniXLSX.serial(iso)`, `MiniXLSX.mime` |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Instalação como app e funcionamento com sinal fraco |
 | `vendor/supabase.js` | Cópia local do `@supabase/supabase-js` |
 | `banco/*.sql` | Esquema, presenças e faixas intermediárias. São rodados **à mão** no SQL Editor do Supabase |
@@ -50,16 +50,16 @@ O arquivo segue **o formato da planilha que o pai do Pedro já usa**:
 Há **dois endereços** e só um atualiza sozinho:
 
 1. **GitHub Pages**: `https://pedroperetti-g.github.io/caderno-do-sensei/` — publica a cada push na branch `main` (1 a 2 minutos).
-2. **Cloudflare Pages**: `https://caderno-do-sensei.pages.dev/` — é o endereço **oficial para os professores**. Em 23/11/2026 ele **não estava atualizando com o GitHub** (devolvia a página inicial no lugar de `xlsx.js`). A pendência é ligar o projeto da Cloudflare ao repositório (Workers & Pages → projeto → conectar ao GitHub, ou fazer deploy manual da pasta raiz, sem build). Depois disso, todo push na `main` publica nos dois. **Primeira coisa a resolver, se ainda estiver assim.**
+2. **Cloudflare Pages**: `https://caderno-do-sensei.pages.dev/` — é o endereço **oficial para os professores**. Em 23/11/2026 ele **não estava atualizando com o GitHub** (devolvia a página inicial no lugar de `planilha.js`). A pendência é ligar o projeto da Cloudflare ao repositório (Workers & Pages → projeto → conectar ao GitHub, ou fazer deploy manual da pasta raiz, sem build). Depois disso, todo push na `main` publica nos dois. **Primeira coisa a resolver, se ainda estiver assim.**
 
-Como conferir se a versão nova está no ar: abra o arquivo alterado com um parâmetro novo, por exemplo `.../xlsx.js?v=2`, para escapar do cache. Quem já tem o app instalado pode precisar abri-lo duas vezes para pegar a versão nova.
+Como conferir se a versão nova está no ar: abra o arquivo alterado com um parâmetro novo, por exemplo `.../planilha.js?v=2`, para escapar do cache. Quem já tem o app instalado pode precisar abri-lo duas vezes para pegar a versão nova.
 
 Plano de hospedagem do Pedro: tornar o repositório **privado** (para não expor código nem conteúdo) e manter só a Cloudflare como endereço. No plano gratuito, o GitHub Pages deixa de funcionar com repositório privado. Por isso: **só tornar o repositório privado depois** que a Cloudflare estiver ligada ao GitHub e os professores tiverem migrado para o endereço novo. O login continua sendo só o do próprio app (sem segunda tela de login na frente), salvo no aparelho para entrar uma vez só. Os professores **não podem perder os dados já registrados**: mudanças de banco devem ser aditivas e feitas "coisa por coisa", em etapas.
 
 ### Service worker (`sw.js`)
 - Arquivo novo na raiz: acrescente em `SHELL` e **aumente o número de `CACHE`** (hoje `caderno-sensei-v5`).
 - Mudou algo em `vendor/` ou `icons/`: também aumente `CACHE` (esses vêm direto do cache).
-- `index.html`, `app.js`, `styles.css` e `xlsx.js` tentam a internet primeiro (espera até 3 s) e só depois usam a cópia salva.
+- `index.html`, `app.js`, `styles.css` e `planilha.js` tentam a internet primeiro (espera até 3 s) e só depois usam a cópia salva.
 
 ## Como testar antes de dizer que está pronto
 
