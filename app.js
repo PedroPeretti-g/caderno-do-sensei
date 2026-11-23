@@ -806,7 +806,7 @@ function eventHTML(ev, mode){
 function renderFinance(){
   const D = data(), ym = state.finMonth, today = isoDate(new Date());
   $('#fin-label').textContent = monthLabel(ym);
-  $('#xl-month').textContent = monthLabel(ym).toLowerCase();
+  $('#xl-month').textContent = ym.slice(0,4);
   const S = D.students.filter(inTurma), all = rowsFor(S, ym), t = totalsFor(all, ym, today);
 
   $('#kpis').innerHTML =
@@ -1336,7 +1336,49 @@ function exportXLSX(){
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       .forEach(s => evRows.push({e:e, s:s, p:e.participantes[s.id] || {}, st:evPartStatus(e, s.id, today)}));
   });
-  if (!rows.length && !evRows.length) { toast('Não há mensalidades nem eventos neste mês para exportar.'); return; }
+  /* --- grade anual no formato da planilha do pai: nome x meses, PG = pagou, X = ainda não pagou --- */
+  const year = +ym.slice(0,4), curYm = today.slice(0,7);
+  const exams = D.events.filter(e => e.tipo === 'exame' && e.date.slice(0,4) === String(year));
+  const gStudents = D.students.filter(inTurma).filter(s => s.ativo !== false || Object.keys(s.pay || {}).some(k => k.slice(0,4) === String(year)));
+  const groups = [], gIdx = {};
+  D.turmas.forEach(t => { gIdx[t.nome] = groups.length; groups.push({nome:t.nome, alunos:[]}); });
+  gStudents.forEach(s => {
+    const k = s.turma || 'Sem turma';
+    if (!(k in gIdx)) { gIdx[k] = groups.length; groups.push({nome:k, alunos:[]}); }
+    groups[gIdx[k]].alunos.push(s);
+  });
+  const gruposComAluno = groups.filter(g => g.alunos.length);
+  if (!gruposComAluno.length && !rows.length && !evRows.length) { toast('Não há alunos nem pagamentos para exportar.'); return; }
+  const brl = v => v.toLocaleString('pt-BR', {style:'currency', currency:'BRL'}).replace(/\u00a0/g, ' ');
+  const usedNames = {};
+  const gridSheets = gruposComAluno.map(g => {
+    let nm = g.nome.replace(/[\\\/?*\[\]:]/g, ' ').trim().slice(0, 28) || 'Turma';
+    if (usedNames[nm]) { let n = 2; while (usedNames[nm+' '+n]) n++; nm = nm+' '+n; }
+    usedNames[nm] = true;
+    const alunos = g.alunos.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    const vals = alunos.filter(s => s.ativo !== false && +s.valor > 0).map(s => +s.valor);
+    const vmin = vals.length ? Math.min.apply(null, vals) : 0, vmax = vals.length ? Math.max.apply(null, vals) : 0;
+    const price = !vals.length ? '' : vmin === vmax ? brl(vmin) : brl(vmin)+' a '+brl(vmax);
+    const out = [
+      [null, {v:g.nome+' '+year, s:'gTitle'}, price ? {v:price, s:'gPrice'} : null],
+      [{v:null, s:'gHeadC'}, {v:'NOME DO ALUNO', s:'gHeadL'}].concat(MES.map(m => ({v:m, s:'gHeadC'})), [{v:'EXA', s:'gHeadC'}])
+    ];
+    alunos.forEach((s, i) => {
+      const cells = MES.map((m, k) => {
+        const mm = year+'-'+pad(k+1), p = s.pay && s.pay[mm];
+        if (p) return {v:'PG', s:'pago'};
+        if (s.ativo === false || (s.inicio && mm < s.inicio) || mm > curYm) return {v:null, s:'center'};
+        if (!(+s.valor > 0)) return {v:'IS', s:'isento'};
+        return {v:'X', s:'atrasado'};
+      });
+      const sts = exams.filter(e => (e.participantes || {})[s.id]).map(e => evPartStatus(e, s.id, today));
+      const exa = sts.some(x => x === 'pendente' || x === 'atrasado') ? {v:'X', s:'atrasado'} : sts.some(x => x === 'pago') ? {v:'PG', s:'pago'} : {v:null, s:'center'};
+      out.push([{v:i+1, s:'int'}, {v:s.nome, s:'text'}].concat(cells, [exa]));
+    });
+    out.push([], [null, {v:'PG = pagou   ·   X = ainda não pagou   ·   IS = isento   ·   vazio = mês que ainda não chegou ou antes de o aluno entrar   ·   EXA = exame de faixa do ano', s:'muted'}]);
+    return {name:nm, rows:out, cols:[5, 38].concat(MES.map(() => 6.5), [7]), headRow:2, freezeRow:2, landscape:true};
+  });
+
 
   const when = monthLabel(ym), turmaTxt = state.turma ? 'Turma: '+state.turma : 'Todas as turmas';
   const nowTxt = new Date().toLocaleDateString('pt-BR')+' às '+new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
@@ -1410,7 +1452,7 @@ function exportXLSX(){
       [{v:'Previsto em eventos', s:'totalLabel'}, {v:te.pago.n+te.pendente.n+te.atrasado.n+te.isento.n, s:'totalInt', f:'SUM(B15:B18)'}, {v:eExp, s:'totalMoney', f:'SUM(C15:C18)'}]);
   }
 
-  const sheets = [{name:'Resumo', rows:sum, cols:[34, 14, 18], hideGrid:true}];
+  const sheets = gridSheets.concat([{name:'Resumo', rows:sum, cols:[34, 14, 18], hideGrid:true}]);
   sheets.push({name:'Mensalidades', rows:mRows, cols:[32, 18, 26, 18, 14, 18, 14, 14, 16], headRow:4, freezeRow:4, filter:'A4:I'+mLast, landscape:true});
   if (evRows.length) sheets.push({name:'Eventos', rows:eRows, cols:[30, 16, 15, 17, 30, 18, 14, 14, 14, 16], headRow:4, freezeRow:4, filter:'A4:J'+eLast, landscape:true});
 

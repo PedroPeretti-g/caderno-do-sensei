@@ -7,12 +7,12 @@
 
 /* estilos disponíveis (nome -> posição em cellXfs, na mesma ordem de STYLES_XML) */
 const ST = {title:1, muted:2, head:3, text:4, date:5, money:6, int:7, pct:8, pago:9, atrasado:10, pendente:11, isento:12,
-  label:13, totalLabel:14, totalInt:15, totalMoney:16, bigPct:17, section:18, center:19};
+  label:13, totalLabel:14, totalInt:15, totalMoney:16, bigPct:17, section:18, center:19, gTitle:20, gPrice:21, gHeadL:22, gHeadC:23};
 
 const STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
 '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
 '<numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="&quot;R$&quot;\\ #,##0.00"/></numFmts>'+
-'<fonts count="10">'+
+'<fonts count="12">'+
   '<font><sz val="11"/><color rgb="FF1A1A1A"/><name val="Calibri"/><family val="2"/></font>'+
   '<font><b/><sz val="11"/><color rgb="FF1A1A1A"/><name val="Calibri"/><family val="2"/></font>'+
   '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'+
@@ -23,6 +23,8 @@ const STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<font><b/><sz val="11"/><color rgb="FF7A5600"/><name val="Calibri"/><family val="2"/></font>'+
   '<font><b/><sz val="11"/><color rgb="FF555555"/><name val="Calibri"/><family val="2"/></font>'+
   '<font><b/><sz val="13"/><color rgb="FF0A2952"/><name val="Calibri"/><family val="2"/></font>'+
+  '<font><b/><sz val="14"/><color rgb="FF1F5FBF"/><name val="Calibri"/><family val="2"/></font>'+
+  '<font><b/><sz val="14"/><color rgb="FFD00000"/><name val="Calibri"/><family val="2"/></font>'+
 '</fonts>'+
 '<fills count="8">'+
   '<fill><patternFill patternType="none"/></fill>'+
@@ -40,7 +42,7 @@ const STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<border><left style="thin"><color rgb="FFD0D0D0"/></left><right style="thin"><color rgb="FFD0D0D0"/></right><top style="medium"><color rgb="FF0A2952"/></top><bottom style="thin"><color rgb="FFD0D0D0"/></bottom><diagonal/></border>'+
 '</borders>'+
 '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-'<cellXfs count="20">'+
+'<cellXfs count="24">'+
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+                                                                                                       /* 0 padrão */
   '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+                                                                                          /* 1 title */
   '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+                                                                                          /* 2 muted */
@@ -61,6 +63,10 @@ const STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<xf numFmtId="9" fontId="1" fillId="7" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+ /* 17 bigPct */
   '<xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+                                                                                          /* 18 section */
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+                  /* 19 center */
+  '<xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+                                                                                         /* 20 gTitle */
+  '<xf numFmtId="0" fontId="11" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+                                                                                         /* 21 gPrice */
+  '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'+                     /* 22 gHeadL */
+  '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+ /* 23 gHeadC */
 '</cellXfs>'+
 '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
 '</styleSheet>';
