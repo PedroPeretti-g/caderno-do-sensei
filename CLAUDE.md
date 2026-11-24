@@ -33,7 +33,7 @@ Regras importantes do domínio de pagamento:
 
 ## Exportar para Excel (Finanças) — o que está feito e por quê
 
-Botão **"Baixar planilha do Excel"** no **fim da aba Finanças** (função `exportXLSX` em `app.js`; cartão `.xl-card` em `index.html`). O botão antigo "Exportar mensalidades" (CSV, no topo da aba) continua existindo.
+Botão **"Baixar planilha do Excel"** no **topo** da aba Finanças (`#export-btn`) e de novo no **fim** (cartão `.xl-card`, `#export-xlsx-btn`); os dois chamam `exportXLSX` em `app.js`. O botão antigo "Exportar mensalidades" (CSV) foi removido em 23/11/2026, porque o Pedro o confundia com a planilha.
 
 O arquivo segue **o formato da planilha que o pai do Pedro já usa**:
 - **Uma aba por turma**, com o nome da turma. Se uma turma estiver filtrada na tela, baixa só ela. O ano é o do mês exibido.

@@ -59,7 +59,6 @@ const groupWeeks = (ls, ym) => {
     return {label: (a === z ? (+a.slice(8)) : (+a.slice(8))+'–'+(+z.slice(8)))+' '+mes, lessons: e[1]};
   });
 };
-const csvCell = v => { let s = String(v==null?'':v); if (/^[=+\-@]/.test(s)) s = "'"+s; return '"'+s.replace(/"/g,'""')+'"'; };
 
 /* eventos */
 const EV_LABEL = {competicao:'Competição', exame:'Exame de faixa', seminario:'Seminário', outro:'Outro'};
@@ -1298,22 +1297,6 @@ async function copySummary(){
     toast('Não foi possível copiar sozinho. O texto está selecionado abaixo.');
   }
 }
-function exportCSV(){
-  const D = data(), ym = state.finMonth, today = isoDate(new Date());
-  const rows = rowsFor(D.students.filter(inTurma), ym).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  if (!rows.length) { toast('Não há mensalidades neste mês para exportar.'); return; }
-  const lines = [['Aluno','Turma','Responsável','Telefone','Vencimento','Valor','Situação','Pago em'].map(csvCell).join(';')];
-  rows.forEach(s => {
-    const p = s.pay && s.pay[ym];
-    lines.push([s.nome, s.turma || '', s.mae || s.pai || '', s.tel || '', fmtBR(dueDate(s, ym)), (p ? +p.v || 0 : +s.valor || 0).toFixed(2).replace('.', ','), statusOf(s, ym, today), p && p.d ? fmtBR(p.d) : ''].map(csvCell).join(';'));
-  });
-  try {
-    const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'mensalidades-'+ym+'.csv';
-    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  } catch (e) { toast('Não foi possível exportar agora.'); }
-}
-
 /* planilha do Excel (.xlsx) do financeiro do mês: aba Resumo, aba Mensalidades e (se houver) aba Eventos */
 function exportXLSX(){
   const X = window.MiniXLSX;
@@ -1532,7 +1515,6 @@ document.addEventListener('click', e => {
     case 'del-lesson': if (confirmTwice(el, 'Confirmar exclusão')) { if (state.editLesson === id) resetLessonForm(); act.delLesson(id); } break;
     case 'cancel-edit': resetLessonForm(); break;
     case 'copy-summary': copySummary(); break;
-    case 'export': exportCSV(); break;
     case 'export-xlsx': exportXLSX(); break;
     case 'att-mark': { const t = attTurmaObj(); if (!t) break; const cur = attIndex(data().att).get(attKey(t.id, el.dataset.sid, state.attDate)), want = el.dataset.v === 'p'; act.setAtt(t.id, el.dataset.sid, state.attDate, cur === want ? null : want); break; }
     case 'att-all': { const t = attTurmaObj(); if (!t) break; const ids = data().students.filter(x => x.turma === t.nome && x.ativo !== false).map(x => x.id); act.allPresent(t.id, ids, state.attDate); break; }
